@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const CATALOG_URL = "/catalogo_crunchyroll_full.json";
+const CATALOG_URL = import.meta.env.BASE_URL + "catalogo_crunchyroll_full.json";
 
 const normalize = (value = "") =>
   String(value)
@@ -43,8 +43,10 @@ const isJapanese = (value) => {
 };
 
 const navClass = (active) =>
-  `cursor-pointer transition ${
-    active ? "text-white font-black" : "text-zinc-400 hover:text-white"
+  `shrink-0 rounded-full px-3 py-2 text-sm font-bold transition ${
+    active
+      ? "bg-white text-black"
+      : "bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white"
   }`;
 
 const getRatingValue = (value) => {
@@ -172,6 +174,8 @@ export default function App() {
   const [error, setError] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState("home");
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -203,12 +207,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = showFilters || selected ? "hidden" : "";
+    document.body.style.overflow =
+      showFilters || selected || showMobileMenu || showMobileSearch
+        ? "hidden"
+        : "";
 
     return () => {
       document.body.style.overflow = "";
     };
-  }, [showFilters, selected]);
+  }, [showFilters, selected, showMobileMenu, showMobileSearch]);
 
   const items = useMemo(
     () =>
@@ -419,31 +426,6 @@ export default function App() {
     minRating !== "0" ||
     sortBy !== "rating-desc";
 
-  const handleFile = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setError("");
-      const text = await file.text();
-      const json = JSON.parse(text);
-      const list = Array.isArray(json) ? json : json.items;
-
-      if (!Array.isArray(list)) {
-        throw new Error("The JSON must be an array or an object with items.");
-      }
-
-      setRawItems(list);
-    } catch (err) {
-      console.error(err);
-      setError(err.message || "Could not read JSON.");
-    }
-  };
-
-  const copyFiltered = async () => {
-    await navigator.clipboard.writeText(JSON.stringify(filtered, null, 2));
-  };
-
   const resetFilters = () => {
     setQuery("");
     setAudioMode("all");
@@ -460,88 +442,101 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white selection:bg-red-600/70">
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/5 bg-black/65 px-4 py-3 backdrop-blur-xl md:px-8">
-        <div className="mx-auto flex max-w-[1800px] items-center gap-4">
-          <div className="text-2xl font-black tracking-tighter text-red-600 md:text-3xl">
-            CRFLIX
-          </div>
-
-          <nav className="hidden items-center gap-5 text-sm font-semibold md:flex">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-black/80 px-3 py-3 backdrop-blur-xl md:px-8">
+        <div className="mx-auto max-w-[1800px]">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setPage("home")}
-              className={navClass(page === "home")}
+              className="shrink-0 text-2xl font-black tracking-tighter text-red-600 md:text-3xl"
             >
-              Início
+              CRFLIX
             </button>
 
-            <button
-              onClick={() => setPage("catalog")}
-              className={navClass(page === "catalog")}
-            >
-              Catálogo
-            </button>
+            <nav className="hidden items-center gap-2 text-sm font-semibold md:flex">
+              <button
+                onClick={() => setPage("home")}
+                className={navClass(page === "home")}
+              >
+                Início
+              </button>
 
-            <button
-              onClick={() => setPage("dub")}
-              className={navClass(page === "dub")}
-            >
-              Dublados
-            </button>
+              <button
+                onClick={() => setPage("catalog")}
+                className={navClass(page === "catalog")}
+              >
+                Catálogo
+              </button>
 
-            <button
-              onClick={() => setPage("sub")}
-              className={navClass(page === "sub")}
-            >
-              Legendas PT-BR
-            </button>
-          </nav>
+              <button
+                onClick={() => setPage("dub")}
+                className={navClass(page === "dub")}
+              >
+                Dublados
+              </button>
 
-          <div className="ml-auto flex flex-1 items-center justify-end gap-3 md:flex-none">
-            <div className="relative w-full max-w-[420px] md:w-[360px]">
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar título, gênero, áudio..."
-                className="w-full rounded-full border border-white/10 bg-black/50 px-5 py-3 text-sm text-white outline-none ring-0 placeholder:text-zinc-500 focus:border-white/35"
-              />
+              <button
+                onClick={() => setPage("sub")}
+                className={navClass(page === "sub")}
+              >
+                Legendas PT-BR
+              </button>
+            </nav>
+
+            <div className="ml-auto hidden items-center justify-end gap-3 md:flex">
+              <div className="relative w-[360px] lg:w-[420px]">
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Buscar título, gênero, áudio..."
+                  className="w-full rounded-full border border-white/10 bg-black/50 px-5 py-3 text-sm text-white outline-none ring-0 placeholder:text-zinc-500 focus:border-white/35"
+                />
+              </div>
+
+              <button
+                onClick={() => setShowFilters(true)}
+                className="rounded-full border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white hover:text-black"
+              >
+                Filtros
+              </button>
+
+              <button
+                onClick={resetFilters}
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
+              >
+                Resetar
+              </button>
             </div>
 
-            <button
-              onClick={() => setShowFilters(true)}
-              className="rounded-full border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white hover:text-black"
-            >
-              Filtros
-            </button>
+            <div className="ml-auto flex shrink-0 items-center gap-2 md:hidden">
+              <button
+                onClick={() => setShowMobileMenu(true)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white"
+                aria-label="Abrir menu"
+              >
+                <span className="translate-y-[-1px] text-2xl leading-none">☰</span>
+              </button>
 
-            <label className="cursor-pointer rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-500">
-              Carregar JSON
-              <input
-                type="file"
-                accept="application/json,.json"
-                className="hidden"
-                onChange={handleFile}
-              />
-            </label>
+              <button
+                onClick={() => setShowMobileSearch(true)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white"
+                aria-label="Buscar"
+              >
+                <span className="translate-y-[-1px] text-xl leading-none">⌕</span>
+              </button>
 
-            <button
-              onClick={copyFiltered}
-              className="rounded-xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/20"
-            >
-              Copiar filtro
-            </button>
-
-            <button
-              onClick={resetFilters}
-              className="rounded-xl border border-white/10 px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
-            >
-              Resetar
-            </button>
+              <button
+                onClick={() => setShowFilters(true)}
+                className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white"
+              >
+                Filtros
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       {error && (
-        <div className="fixed left-4 right-4 top-20 z-50 rounded-2xl border border-red-500/40 bg-red-950/90 p-4 text-red-100 shadow-2xl">
+        <div className="fixed left-3 right-3 top-[148px] z-[60] rounded-2xl border border-red-500/40 bg-red-950/90 p-4 text-sm text-red-100 shadow-2xl md:top-24">
           {error}
         </div>
       )}
@@ -552,7 +547,7 @@ export default function App() {
         <EmptyHero />
       )}
 
-      <section className="relative z-20 mt-[-40px] space-y-10 px-4 pb-20 md:mt-[-60px] md:px-8">
+      <section className="relative z-20 mt-0 space-y-8 px-3 pb-20 md:mt-[-40px] md:px-8">
         <div className="mx-auto max-w-[1800px] space-y-7">
           {showFilters && (
             <FilterModal
@@ -580,9 +575,9 @@ export default function App() {
             />
           )}
 
-          <div className="mb-5 flex items-end justify-between gap-4 pt-8">
+          <div className="flex flex-col gap-4 pt-4 md:flex-row md:items-end md:justify-between md:pt-8">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.28em] text-red-500">
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-red-500 md:text-sm">
                 {page === "home" ? "Catálogo" : "Resultado filtrado"}
               </p>
 
@@ -598,15 +593,17 @@ export default function App() {
                         : "Todos os resultados"}
               </h2>
 
-              <p className="mt-2 text-sm text-zinc-400">
-                {pageFiltered.length} exibidos de {items.length} títulos · {stats.dub} dublados · {stats.ptBR} com áudio PT-BR · {stats.subtitlesPTBR} com legendas PT-BR
+              <p className="mt-2 max-w-full text-xs leading-relaxed text-zinc-400 md:text-sm">
+                {pageFiltered.length} exibidos de {items.length} títulos ·{" "}
+                {stats.dub} dublados · {stats.ptBR} com áudio PT-BR ·{" "}
+                {stats.subtitlesPTBR} com legendas PT-BR
               </p>
             </div>
 
             {hasActiveFilters && (
               <button
                 onClick={resetFilters}
-                className="rounded-xl border border-white/10 px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
+                className="w-fit rounded-xl border border-white/10 px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
               >
                 Limpar filtros
               </button>
@@ -648,6 +645,22 @@ export default function App() {
         </div>
       </section>
 
+      {showMobileMenu && (
+        <MobileMenuModal
+          page={page}
+          setPage={setPage}
+          onClose={() => setShowMobileMenu(false)}
+        />
+      )}
+
+      {showMobileSearch && (
+        <MobileSearchModal
+          query={query}
+          setQuery={setQuery}
+          onClose={() => setShowMobileSearch(false)}
+        />
+      )}
+
       {selected && (
         <DetailsModal item={selected} onClose={() => setSelected(null)} />
       )}
@@ -669,34 +682,34 @@ function LoadingScreen() {
 }
 
 function EmptyHero() {
-  return <section className="min-h-[60vh] bg-black pt-28" />;
+  return <section className="min-h-[48vh] bg-black pt-40 md:min-h-[60vh]" />;
 }
 
 function Hero({ item, onOpen }) {
   return (
-    <section className="relative min-h-[86vh] overflow-hidden pt-24">
+    <section className="relative min-h-[74vh] overflow-hidden pt-[152px] md:min-h-[86vh] md:pt-24">
       {item.cover && (
         <img
           src={item.cover}
           alt=""
-          className="absolute inset-0 h-full w-full scale-105 object-cover opacity-45 blur-[1px]"
+          className="absolute inset-0 h-full w-full scale-105 object-cover opacity-40 blur-[1px]"
         />
       )}
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(220,38,38,0.28),transparent_32%),linear-gradient(90deg,#050505_0%,rgba(5,5,5,0.92)_28%,rgba(5,5,5,0.45)_64%,#050505_100%)]" />
-      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#050505] via-[#050505]/90 to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(220,38,38,0.22),transparent_32%),linear-gradient(90deg,#050505_0%,rgba(5,5,5,0.92)_35%,rgba(5,5,5,0.55)_74%,#050505_100%)]" />
+      <div className="absolute inset-x-0 bottom-0 h-52 bg-gradient-to-t from-[#050505] via-[#050505]/90 to-transparent" />
 
-      <div className="relative z-10 mx-auto grid max-w-[1800px] grid-cols-1 items-center gap-10 px-4 py-14 md:grid-cols-[minmax(0,1fr)_360px] md:px-8 lg:grid-cols-[minmax(0,1fr)_440px]">
+      <div className="relative z-10 mx-auto grid max-w-[1800px] grid-cols-1 items-center gap-8 px-3 py-8 md:grid-cols-[minmax(0,1fr)_360px] md:px-8 md:py-14 lg:grid-cols-[minmax(0,1fr)_440px]">
         <div className="max-w-4xl">
-          <p className="mb-4 text-sm font-black uppercase tracking-[0.38em] text-red-500">
+          <p className="mb-3 text-xs font-black uppercase tracking-[0.28em] text-red-500 md:text-sm md:tracking-[0.38em]">
             Catálogo local Crunchyroll
           </p>
 
-          <h1 className="text-5xl font-black leading-[0.95] tracking-tighter md:text-7xl lg:text-8xl">
+          <h1 className="line-clamp-4 text-4xl font-black leading-[0.95] tracking-tighter sm:text-5xl md:text-7xl lg:text-8xl">
             {item.title}
           </h1>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3 text-sm font-bold text-zinc-200">
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-200 md:mt-5 md:gap-3 md:text-sm">
             {item.rating && (
               <span className="text-emerald-400">⭐ {item.rating}</span>
             )}
@@ -719,14 +732,14 @@ function Hero({ item, onOpen }) {
             )}
           </div>
 
-          <p className="mt-6 max-w-3xl text-base leading-relaxed text-zinc-200 line-clamp-5 md:text-xl">
+          <p className="mt-5 line-clamp-4 max-w-3xl text-sm leading-relaxed text-zinc-200 md:text-xl">
             {item.synopsis || "Sinopse ainda não preenchida no JSON."}
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row md:mt-8">
             <button
               onClick={onOpen}
-              className="rounded-md bg-white px-8 py-3 text-lg font-black text-black transition hover:bg-zinc-200"
+              className="rounded-md bg-white px-6 py-3 text-base font-black text-black transition hover:bg-zinc-200 md:px-8 md:text-lg"
             >
               ▶ Ver detalhes
             </button>
@@ -736,7 +749,7 @@ function Hero({ item, onOpen }) {
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-md bg-zinc-700/80 px-8 py-3 text-lg font-black text-white transition hover:bg-zinc-600"
+                className="rounded-md bg-zinc-700/80 px-6 py-3 text-center text-base font-black text-white transition hover:bg-zinc-600 md:px-8 md:text-lg"
               >
                 Abrir Crunchyroll
               </a>
@@ -766,36 +779,36 @@ function Hero({ item, onOpen }) {
 
 function FilterModal(props) {
   return (
-    <div className="fixed left-0 right-0 top-[71px] z-[9999] h-[calc(100vh-71px)] overflow-hidden bg-[#050505]/90 backdrop-blur-2xl">
+    <div className="fixed left-0 right-0 top-[64px] md:top-[71px] z-[9999] h-[calc(100dvh-64px)] md:h-[calc(100dvh-71px)] overflow-hidden bg-[#050505]/94 backdrop-blur-2xl">
       <button
         onClick={props.onClose}
-        className="absolute right-8 top-8 z-[10000] grid h-12 w-12 place-items-center rounded-full bg-white text-xl font-black text-black transition hover:bg-red-600 hover:text-white"
+        className="absolute right-4 top-4 z-[10000] grid h-11 w-11 place-items-center rounded-full bg-white text-xl font-black text-black transition hover:bg-red-600 hover:text-white md:right-8 md:top-8 md:h-12 md:w-12"
         aria-label="Fechar filtros"
       >
         ✕
       </button>
 
-      <section className="flex h-full w-full items-center justify-center overflow-hidden px-8 pb-24">
+      <section className="h-full overflow-y-auto overflow-x-hidden px-4 pb-8 pt-6 md:flex md:items-center md:justify-center md:px-8 md:pb-10 md:pt-0">
         <div className="w-full max-w-6xl">
-          <div className="mb-10 flex items-end justify-between gap-6 pr-20">
+          <div className="mb-7 flex flex-col gap-4 pr-14 md:mb-10 md:flex-row md:items-end md:justify-between md:gap-6 md:pr-20">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.35em] text-red-500">
+              <p className="text-xs font-black uppercase tracking-[0.3em] text-red-500 md:text-sm">
                 Refinar catálogo
               </p>
-              <h2 className="mt-3 text-6xl font-black tracking-tight">
+              <h2 className="mt-2 text-4xl font-black tracking-tight md:text-6xl">
                 Filtros
               </h2>
             </div>
 
             <button
               onClick={props.onReset}
-              className="rounded-xl border border-white/10 px-5 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
+              className="w-fit rounded-xl border border-white/10 px-4 py-3 text-xs font-black text-zinc-300 transition hover:bg-white/10 md:px-5 md:text-sm"
             >
               Limpar filtros
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
             <Select value={props.audioMode} onChange={props.setAudioMode}>
               <option value="all">Áudio: todos</option>
               <option value="ptbr">Áudio PT-BR</option>
@@ -852,11 +865,9 @@ function FilterModal(props) {
             </Select>
           </div>
 
-          <div className="mt-10">
+          <div className="mt-8 md:mt-10">
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-sm font-black text-zinc-300">
-                Nota mínima
-              </span>
+              <span className="text-sm font-black text-zinc-300">Nota mínima</span>
               <span className="rounded-full bg-red-600 px-3 py-1 text-sm font-black text-white">
                 {props.minRating}
               </span>
@@ -873,10 +884,10 @@ function FilterModal(props) {
             />
           </div>
 
-          <div className="mt-12 flex justify-end">
+          <div className="mt-8 flex md:mt-12 md:justify-end">
             <button
               onClick={props.onClose}
-              className="rounded-xl bg-white px-8 py-4 font-black text-black transition hover:bg-zinc-200"
+              className="w-full rounded-xl bg-white px-8 py-4 font-black text-black transition hover:bg-zinc-200 md:w-auto"
             >
               Aplicar filtros
             </button>
@@ -920,18 +931,18 @@ function CatalogRow({ title, items, onSelect }) {
 
   return (
     <section className="relative">
-      <h2 className="mb-4 text-2xl font-black tracking-tight md:text-3xl">
+      <h2 className="mb-3 text-xl font-black tracking-tight md:mb-4 md:text-3xl">
         {title}
       </h2>
 
       <div
         ref={rowRef}
-        className="scrollbar-hide flex gap-3 overflow-x-auto overflow-y-hidden scroll-smooth pb-8 pr-8"
+        className="scrollbar-hide flex gap-3 overflow-x-auto overflow-y-hidden scroll-smooth pb-6 pr-8 md:pb-8"
       >
         {items.map((item, index) => (
           <div
             key={`${item.id}-${index}`}
-            className="w-[170px] shrink-0 sm:w-[200px] md:w-[220px] xl:w-[240px]"
+            className="w-[145px] shrink-0 sm:w-[170px] md:w-[220px] xl:w-[240px]"
           >
             <PosterCard item={item} onClick={() => onSelect(item)} />
           </div>
@@ -945,13 +956,13 @@ function PosterCard({ item, onClick }) {
   return (
     <article className="group relative">
       <button onClick={onClick} className="block w-full text-left">
-        <div className="relative overflow-hidden rounded-xl bg-zinc-900 shadow-lg ring-1 ring-white/10 transition-[box-shadow,transform] duration-300 ease-out group-hover:z-20 group-hover:-translate-y-1 group-hover:ring-red-500/70 group-hover:shadow-[0_18px_55px_rgba(0,0,0,0.75)]">
+        <div className="relative overflow-hidden rounded-xl bg-zinc-900 shadow-lg ring-1 ring-white/10 transition-[box-shadow,transform] duration-300 ease-out md:group-hover:z-20 md:group-hover:-translate-y-1 md:group-hover:ring-red-500/70 md:group-hover:shadow-[0_18px_55px_rgba(0,0,0,0.75)]">
           <div className="relative aspect-[2/3] overflow-hidden">
             {item.cover ? (
               <img
                 src={item.cover}
                 alt={item.title}
-                className="h-full w-full object-cover transition-transform duration-700 ease-out will-change-transform group-hover:scale-[1.08]"
+                className="h-full w-full object-cover transition-transform duration-700 ease-out will-change-transform md:group-hover:scale-[1.08]"
                 loading="lazy"
               />
             ) : (
@@ -962,22 +973,22 @@ function PosterCard({ item, onClick }) {
 
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/15 to-transparent opacity-75" />
 
-            <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+            <div className="absolute left-1.5 top-1.5 flex flex-wrap gap-1 md:left-2 md:top-2">
               {item.ageRating && <Pill>{item.ageRating}</Pill>}
               {item.flags.ptBR && <Pill tone="light">PT-BR</Pill>}
             </div>
 
             {item.rating && (
-              <div className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-xs font-black text-yellow-300 backdrop-blur">
+              <div className="absolute right-1.5 top-1.5 rounded-full bg-black/70 px-2 py-1 text-[10px] font-black text-yellow-300 backdrop-blur md:right-2 md:top-2 md:text-xs">
                 ⭐ {item.rating}
               </div>
             )}
 
-            <div className="absolute inset-x-0 bottom-0 p-3">
-              <h3 className="line-clamp-2 text-sm font-black leading-tight text-white md:text-base">
+            <div className="absolute inset-x-0 bottom-0 p-2.5 md:p-3">
+              <h3 className="line-clamp-2 text-xs font-black leading-tight text-white md:text-base">
                 {item.title}
               </h3>
-              <p className="mt-1 line-clamp-1 text-xs font-semibold text-zinc-300">
+              <p className="mt-1 line-clamp-1 text-[10px] font-semibold text-zinc-300 md:text-xs">
                 {item.genres.slice(0, 2).join(" • ") || "Anime"}
               </p>
             </div>
@@ -1000,35 +1011,35 @@ function PosterCard({ item, onClick }) {
 
 function DetailsModal({ item, onClose }) {
   return (
-    <div className="fixed inset-0 z-[9999] overflow-hidden bg-black/80 backdrop-blur-xl">
+    <div className="fixed inset-0 z-[9999] overflow-y-auto overflow-x-hidden md:overflow-hidden bg-black/90 backdrop-blur-xl">
       {item.cover && (
         <img
           src={item.cover}
           alt=""
-          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-2xl"
+          className="fixed inset-0 h-full w-full scale-110 object-cover opacity-20 blur-2xl"
         />
       )}
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_25%,rgba(220,38,38,0.28),transparent_34%),linear-gradient(90deg,#050505_0%,rgba(5,5,5,0.92)_34%,rgba(5,5,5,0.55)_68%,#050505_100%)]" />
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_75%_25%,rgba(220,38,38,0.24),transparent_34%),linear-gradient(180deg,rgba(5,5,5,0.72)_0%,#050505_52%,#050505_100%)] md:bg-[radial-gradient(circle_at_75%_25%,rgba(220,38,38,0.28),transparent_34%),linear-gradient(90deg,#050505_0%,rgba(5,5,5,0.92)_34%,rgba(5,5,5,0.55)_68%,#050505_100%)]" />
 
       <button
         onClick={onClose}
-        className="absolute right-5 top-5 z-[10000] grid h-12 w-12 place-items-center rounded-full border border-white/10 bg-white/10 text-xl font-black text-white backdrop-blur-xl transition hover:bg-white hover:text-black"
+        className="fixed right-4 top-4 z-[10000] grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/15 text-xl font-black text-white backdrop-blur-xl transition hover:bg-white hover:text-black md:right-5 md:top-5 md:h-12 md:w-12"
       >
         ✕
       </button>
 
-      <section className="relative z-10 grid h-screen grid-cols-1 gap-8 p-5 pt-20 md:grid-cols-[320px_1fr] md:p-10 lg:grid-cols-[380px_1fr] xl:grid-cols-[420px_1fr]">
-        <div className="hidden items-center md:flex">
-          <div className="relative w-full overflow-hidden rounded-[2rem] border border-white/10 bg-white/10 p-3 shadow-[0_40px_120px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
+      <section className="relative z-10 mx-auto min-h-screen w-full max-w-[1800px] px-4 pb-10 pt-16 md:grid md:h-screen md:grid-cols-[320px_minmax(0,1fr)] md:gap-8 md:p-10 lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
+        <div className="mx-auto mb-6 max-w-[220px] md:mb-0 md:flex md:max-w-none md:items-center">
+          <div className="relative w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-2 shadow-[0_30px_90px_rgba(0,0,0,0.75)] backdrop-blur-2xl md:rounded-[2rem] md:p-3">
             {item.cover ? (
               <img
                 src={item.cover}
                 alt={item.title}
-                className="aspect-[2/3] w-full rounded-[1.5rem] object-cover shadow-2xl"
+                className="aspect-[2/3] w-full rounded-[1rem] object-cover shadow-2xl md:rounded-[1.5rem]"
               />
             ) : (
-              <div className="grid aspect-[2/3] place-items-center rounded-[1.5rem] bg-zinc-900 text-zinc-500">
+              <div className="grid aspect-[2/3] place-items-center rounded-[1rem] bg-zinc-900 text-zinc-500 md:rounded-[1.5rem]">
                 Sem capa
               </div>
             )}
@@ -1037,7 +1048,7 @@ function DetailsModal({ item, onClose }) {
 
         <div className="flex min-h-0 flex-col justify-center">
           <div className="max-w-5xl">
-            <div className="mb-5 flex flex-wrap gap-2">
+            <div className="mb-4 flex flex-wrap gap-2 md:mb-5">
               {item.rating && (
                 <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-black text-black">
                   ⭐ {item.rating}
@@ -1063,27 +1074,27 @@ function DetailsModal({ item, onClose }) {
               )}
             </div>
 
-            <h2 className="max-w-5xl text-4xl font-black leading-[0.95] tracking-tighter md:text-6xl xl:text-7xl">
+            <h2 className="max-w-5xl text-3xl font-black leading-[0.98] tracking-tighter md:text-6xl xl:text-7xl">
               {item.title}
             </h2>
 
-            <p className="mt-5 text-sm font-bold text-zinc-300 md:text-base">
+            <p className="mt-4 text-sm font-bold text-zinc-300 md:mt-5 md:text-base">
               {[item.seasons, item.episodes].filter(Boolean).join(" · ") ||
                 "Temporadas não informadas"}
             </p>
 
-            <p className="mt-6 line-clamp-5 max-w-4xl text-base leading-relaxed text-zinc-200 md:text-lg xl:text-xl">
+            <p className="mt-5 max-w-4xl text-sm leading-relaxed text-zinc-200 md:mt-6 md:line-clamp-5 md:text-lg xl:text-xl">
               {item.synopsis || "Sinopse ainda não preenchida no JSON."}
             </p>
 
-            <div className="mt-7 flex flex-wrap gap-2">
+            <div className="mt-6 flex flex-wrap gap-2 md:mt-7">
               <Flag active={item.flags.dub}>Dublado</Flag>
               <Flag active={item.flags.ptBR}>Áudio PT-BR</Flag>
               <Flag active={item.flags.subtitlesPTBR}>Legenda PT-BR</Flag>
               <Flag active={item.flags.onlyJapaneseAudio}>Somente japonês</Flag>
             </div>
 
-            <div className="mt-8 grid gap-3 md:grid-cols-3">
+            <div className="mt-6 grid gap-3 md:mt-8 md:grid-cols-3">
               <DetailBlock label="Áudio" value={item.audio.join(", ") || "—"} />
               <DetailBlock
                 label="Legendas"
@@ -1095,26 +1106,17 @@ function DetailsModal({ item, onClose }) {
               />
             </div>
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row md:mt-8">
               {item.url && (
                 <a
                   href={item.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl bg-white px-6 py-3 font-black text-black transition hover:bg-zinc-200"
+                  className="rounded-xl bg-white px-6 py-3 text-center font-black text-black transition hover:bg-zinc-200"
                 >
                   Abrir Crunchyroll
                 </a>
               )}
-
-              <button
-                onClick={() =>
-                  navigator.clipboard.writeText(JSON.stringify(item, null, 2))
-                }
-                className="rounded-xl border border-white/10 bg-white/10 px-6 py-3 font-black text-white backdrop-blur transition hover:bg-white/20"
-              >
-                Copiar JSON
-              </button>
             </div>
           </div>
         </div>
@@ -1128,7 +1130,7 @@ function Select({ value, onChange, children }) {
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="rounded-xl border border-white/10 bg-black/70 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-red-500"
+      className="min-h-12 rounded-xl border border-white/10 bg-black/70 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-red-500"
     >
       {children}
     </select>
@@ -1138,8 +1140,8 @@ function Select({ value, onChange, children }) {
 function Pill({ children, tone = "red" }) {
   const className =
     tone === "light"
-      ? "rounded bg-white px-2 py-1 text-[10px] font-black text-black"
-      : "rounded bg-red-600 px-2 py-1 text-[10px] font-black text-white";
+      ? "rounded bg-white px-1.5 py-1 text-[9px] font-black text-black md:px-2 md:text-[10px]"
+      : "rounded bg-red-600 px-1.5 py-1 text-[9px] font-black text-white md:px-2 md:text-[10px]";
 
   return <span className={className}>{children}</span>;
 }
@@ -1160,13 +1162,91 @@ function Flag({ active, children }) {
 
 function DetailBlock({ label, value }) {
   return (
-    <div className="min-h-[92px] rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-xl">
+    <div className="min-h-[82px] rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-xl md:min-h-[92px]">
       <div className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
         {label}
       </div>
-      <div className="mt-2 line-clamp-2 break-words text-sm leading-relaxed text-zinc-200">
+      <div className="mt-2 break-words text-sm leading-relaxed text-zinc-200 md:line-clamp-2">
         {value}
       </div>
+    </div>
+  );
+}
+
+function MobileMenuModal({ page, setPage, onClose }) {
+  const goTo = (value) => {
+    setPage(value);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-2xl md:hidden">
+      <button
+        onClick={onClose}
+        className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white text-xl font-black text-black"
+      >
+        ✕
+      </button>
+
+      <div className="flex min-h-screen flex-col justify-center px-6">
+        <p className="mb-4 text-xs font-black uppercase tracking-[0.35em] text-red-500">
+          Menu
+        </p>
+
+        <div className="space-y-3">
+          <MobileMenuButton active={page === "home"} onClick={() => goTo("home")}>Início</MobileMenuButton>
+          <MobileMenuButton active={page === "catalog"} onClick={() => goTo("catalog")}>Catálogo</MobileMenuButton>
+          <MobileMenuButton active={page === "dub"} onClick={() => goTo("dub")}>Dublados</MobileMenuButton>
+          <MobileMenuButton active={page === "sub"} onClick={() => goTo("sub")}>Legendas PT-BR</MobileMenuButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileMenuButton({ active, children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        active
+          ? "w-full rounded-2xl bg-white px-5 py-4 text-left text-xl font-black text-black"
+          : "w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-left text-xl font-black text-white"
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function MobileSearchModal({ query, setQuery, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/90 px-4 pt-20 backdrop-blur-2xl md:hidden">
+      <button
+        onClick={onClose}
+        className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white text-xl font-black text-black"
+      >
+        ✕
+      </button>
+
+      <p className="mb-4 text-xs font-black uppercase tracking-[0.35em] text-red-500">
+        Buscar
+      </p>
+
+      <input
+        autoFocus
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Buscar anime, gênero, áudio..."
+        className="w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-lg font-bold text-white outline-none placeholder:text-zinc-500 focus:border-red-500"
+      />
+
+      <button
+        onClick={onClose}
+        className="mt-5 w-full rounded-2xl bg-white px-5 py-4 font-black text-black"
+      >
+        Ver resultados
+      </button>
     </div>
   );
 }
