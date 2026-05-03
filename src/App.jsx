@@ -42,6 +42,11 @@ const isJapanese = (value) => {
   return text === "japanese" || text === "ja-jp" || text === "japones";
 };
 
+const navClass = (active) =>
+  `cursor-pointer transition ${
+    active ? "text-white font-black" : "text-zinc-400 hover:text-white"
+  }`;
+
 const getRatingValue = (value) => {
   if (!value) return "";
   if (typeof value === "object") {
@@ -166,6 +171,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState("home");
 
   useEffect(() => {
     setLoading(true);
@@ -342,30 +348,44 @@ export default function App() {
     sortBy,
   ]);
 
+  const pageFiltered = useMemo(() => {
+    let base = filtered;
+
+    if (page === "dub") {
+      base = base.filter((item) => item.flags.dub || item.flags.ptBR);
+    }
+
+    if (page === "sub") {
+      base = base.filter((item) => item.flags.subtitlesPTBR);
+    }
+
+    return base;
+  }, [filtered, page]);
+
   const stats = useMemo(
     () => ({
       total: items.length,
-      filtered: filtered.length,
+      filtered: pageFiltered.length,
       dub: items.filter((item) => item.flags.dub).length,
       ptBR: items.filter((item) => item.flags.ptBR).length,
       subtitlesPTBR: items.filter((item) => item.flags.subtitlesPTBR).length,
       withSynopsis: items.filter((item) => item.synopsis).length,
     }),
-    [items, filtered],
+    [items, pageFiltered],
   );
 
   const hero = useMemo(() => {
-    const candidates = filtered.filter((item) => item.cover && item.synopsis);
+    const candidates = pageFiltered.filter((item) => item.cover && item.synopsis);
     return (
       candidates[0] ||
-      filtered.find((item) => item.cover) ||
-      filtered[0] ||
+      pageFiltered.find((item) => item.cover) ||
+      pageFiltered[0] ||
       null
     );
-  }, [filtered]);
+  }, [pageFiltered]);
 
   const rows = useMemo(() => {
-    const base = filtered.filter((item) => item.id !== hero?.id);
+    const base = pageFiltered.filter((item) => item.id !== hero?.id);
     const only = (fn) => base.filter(fn).slice(0, 24);
 
     return [
@@ -385,9 +405,10 @@ export default function App() {
           .slice(0, 24),
       },
     ].filter((row) => row.items.length);
-  }, [filtered, hero]);
+  }, [pageFiltered, hero]);
 
   const hasActiveFilters =
+    page !== "home" ||
     Boolean(query.trim()) ||
     audioMode !== "all" ||
     subtitleMode !== "all" ||
@@ -445,11 +466,34 @@ export default function App() {
             CRFLIX
           </div>
 
-          <nav className="hidden items-center gap-5 text-sm font-semibold text-zinc-300 md:flex">
-            <span>Início</span>
-            <span>Catálogo</span>
-            <span>Dublados</span>
-            <span>Legendas PT-BR</span>
+          <nav className="hidden items-center gap-5 text-sm font-semibold md:flex">
+            <button
+              onClick={() => setPage("home")}
+              className={navClass(page === "home")}
+            >
+              Início
+            </button>
+
+            <button
+              onClick={() => setPage("catalog")}
+              className={navClass(page === "catalog")}
+            >
+              Catálogo
+            </button>
+
+            <button
+              onClick={() => setPage("dub")}
+              className={navClass(page === "dub")}
+            >
+              Dublados
+            </button>
+
+            <button
+              onClick={() => setPage("sub")}
+              className={navClass(page === "sub")}
+            >
+              Legendas PT-BR
+            </button>
           </nav>
 
           <div className="ml-auto flex flex-1 items-center justify-end gap-3 md:flex-none">
@@ -468,6 +512,30 @@ export default function App() {
             >
               Filtros
             </button>
+
+            <label className="cursor-pointer rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-500">
+              Carregar JSON
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={handleFile}
+              />
+            </label>
+
+            <button
+              onClick={copyFiltered}
+              className="rounded-xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/20"
+            >
+              Copiar filtro
+            </button>
+
+            <button
+              onClick={resetFilters}
+              className="rounded-xl border border-white/10 px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
+            >
+              Resetar
+            </button>
           </div>
         </div>
       </header>
@@ -484,16 +552,8 @@ export default function App() {
         <EmptyHero />
       )}
 
-      <section className="relative z-20 -mt-16 space-y-10 px-4 pb-20 md:-mt-28 md:px-8">
+      <section className="relative z-20 mt-[-40px] space-y-10 px-4 pb-20 md:mt-[-60px] md:px-8">
         <div className="mx-auto max-w-[1800px] space-y-7">
-          <StatsBar
-            stats={stats}
-            onFile={handleFile}
-            onCopy={copyFiltered}
-            onReset={resetFilters}
-            hasActiveFilters={hasActiveFilters}
-          />
-
           {showFilters && (
             <FilterModal
               audioMode={audioMode}
@@ -520,39 +580,49 @@ export default function App() {
             />
           )}
 
+          <div className="mb-5 flex items-end justify-between gap-4 pt-8">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.28em] text-red-500">
+                {page === "home" ? "Catálogo" : "Resultado filtrado"}
+              </p>
+
+              <h2 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">
+                {page === "catalog"
+                  ? "Catálogo completo"
+                  : page === "dub"
+                    ? "Animes dublados"
+                    : page === "sub"
+                      ? "Animes com legenda PT-BR"
+                      : hasActiveFilters
+                        ? "Resultado dos filtros"
+                        : "Todos os resultados"}
+              </h2>
+
+              <p className="mt-2 text-sm text-zinc-400">
+                {pageFiltered.length} exibidos de {items.length} títulos · {stats.dub} dublados · {stats.ptBR} com áudio PT-BR · {stats.subtitlesPTBR} com legendas PT-BR
+              </p>
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+
           {hasActiveFilters ? (
-            <section>
-              <div className="mb-5 flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.28em] text-red-500">
-                    Filtro ativo
-                  </p>
-                  <h2 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">
-                    Resultado dos filtros
-                  </h2>
-                  <p className="mt-2 text-sm text-zinc-400">
-                    {filtered.length} títulos encontrados
-                  </p>
-                </div>
-
-                <button
-                  onClick={resetFilters}
-                  className="rounded-xl border border-white/10 px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
-                >
-                  Limpar filtros
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
-                {filtered.map((item, index) => (
-                  <PosterCard
-                    key={`${item.id}-${index}`}
-                    item={item}
-                    onClick={() => setSelected(item)}
-                  />
-                ))}
-              </div>
-            </section>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+              {pageFiltered.map((item, index) => (
+                <PosterCard
+                  key={`${item.id}-${index}`}
+                  item={item}
+                  onClick={() => setSelected(item)}
+                />
+              ))}
+            </div>
           ) : (
             <>
               {rows.map((row) => (
@@ -564,28 +634,15 @@ export default function App() {
                 />
               ))}
 
-              <section>
-                <div className="mb-4 flex items-end justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-black tracking-tight md:text-3xl">
-                      Todos os resultados
-                    </h2>
-                    <p className="text-sm text-zinc-400">
-                      {filtered.length} títulos encontrados
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
-                  {filtered.map((item, index) => (
-                    <PosterCard
-                      key={`${item.id}-${index}`}
-                      item={item}
-                      onClick={() => setSelected(item)}
-                    />
-                  ))}
-                </div>
-              </section>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                {pageFiltered.map((item, index) => (
+                  <PosterCard
+                    key={`${item.id}-${index}`}
+                    item={item}
+                    onClick={() => setSelected(item)}
+                  />
+                ))}
+              </div>
             </>
           )}
         </div>
@@ -704,52 +761,6 @@ function Hero({ item, onOpen }) {
         </button>
       </div>
     </section>
-  );
-}
-
-function StatsBar({ stats, onFile, onCopy, onReset, hasActiveFilters }) {
-  return (
-    <div className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-black/25 px-5 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl md:flex-row md:items-center md:justify-between">
-      <div>
-        <p className="text-sm font-black uppercase tracking-[0.22em] text-red-500">
-          {hasActiveFilters ? "Resultado filtrado" : "Catálogo"}
-        </p>
-        <p className="mt-1 text-sm font-semibold text-zinc-300">
-          {stats.filtered} exibidos de {stats.total} títulos
-          <span className="hidden text-zinc-500 md:inline">
-            {" "}
-            · {stats.dub} dublados · {stats.ptBR} com áudio PT-BR ·{" "}
-            {stats.subtitlesPTBR} com legendas PT-BR
-          </span>
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <label className="cursor-pointer rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-500">
-          Carregar JSON
-          <input
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={onFile}
-          />
-        </label>
-
-        <button
-          onClick={onCopy}
-          className="rounded-xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/20"
-        >
-          Copiar filtro
-        </button>
-
-        <button
-          onClick={onReset}
-          className="rounded-xl border border-white/10 px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/10"
-        >
-          Resetar
-        </button>
-      </div>
-    </div>
   );
 }
 
